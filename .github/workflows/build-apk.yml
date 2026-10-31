@@ -97,13 +97,36 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept licences and install the exact platform and build tools
+      # android-actions/setup-android@v3 exits with code 2 on the current
+      # ubuntu-latest image (observed on run 41205431636, step "Set up
+      # Android SDK", 6 s, annotation "Process completed with exit code 2"). GitHub-hosted runners already ship the Android SDK, so
+      # this step talks to it directly: accept licences, install exactly the
+      # packages this project needs (compileSdk 35; AGP 8.7.3 defaults to
+      # build-tools 35.0.0), then verify the directories really exist.
+      - name: Set up Android SDK, licences and the exact packages
+        shell: bash
         run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platforms;android-35" "build-tools;34.0.0"
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER=""
+          if command -v sdkmanager > /dev/null 2>&1; then
+            SDKMANAGER="$(command -v sdkmanager)"
+          else
+            for cand in "$SDK/cmdline-tools/latest/bin/sdkmanager" "$SDK/cmdline-tools"/*/bin/sdkmanager; do
+              if [ -x "$cand" ]; then SDKMANAGER="$cand"; break; fi
+            done
+          fi
+          if [ -z "$SDKMANAGER" ]; then
+            echo "::error::no sdkmanager found under $SDK"
+            exit 1
+          fi
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+          test -d "$SDK/platforms/android-35"
+          test -d "$SDK/build-tools/35.0.0"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          "$SDKMANAGER" --list_installed || true
 
       - name: Make gradlew executable
         working-directory: android
@@ -149,44 +172,53 @@ jobs:
               cat qa-out/NEX_1.0.0_QA_debug.apk.sha256
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "### APK identity"
+              echo "- not produced: the build did not reach the packaging step"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      # One heredoc, every line at the same YAML indent so the PY terminator
+      # lands at column 0 - an indented terminator is a bash syntax error
+      # (exit code 2), which is what failed on run 41205431636 step 12.
+      # Missing reports are stated honestly instead of crashing the step.
       - name: Test and lint counts to the job summary
         if: always()
         run: |
           python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import glob
+          import os
           import xml.etree.ElementTree as ET
-          tests = failures = errors = skipped = 0
-          for path in glob.glob('android/app/build/test-results/testDebugUnitTest/*.xml'):
-              root = ET.parse(path).getroot()
-              tests += int(root.get('tests', 0))
-              failures += int(root.get('failures', 0))
-              errors += int(root.get('errors', 0))
-              skipped += int(root.get('skipped', 0))
           print("### Android unit tests")
-          print(f"- tests: {tests}")
-          print(f"- failures: {failures}")
-          print(f"- errors: {errors}")
-          print(f"- skipped: {skipped}")
+          files = sorted(glob.glob('android/app/build/test-results/testDebugUnitTest/*.xml'))
+          if not files:
+              print("- no XML results: the unit test task did not complete")
+          else:
+              tests = failures = errors = skipped = 0
+              for path in files:
+                  root = ET.parse(path).getroot()
+                  tests += int(root.get('tests', 0))
+                  failures += int(root.get('failures', 0))
+                  errors += int(root.get('errors', 0))
+                  skipped += int(root.get('skipped', 0))
+              print(f"- test classes: {len(files)}")
+              print(f"- tests: {tests}")
+              print(f"- failures: {failures}")
+              print(f"- errors: {errors}")
+              print(f"- skipped: {skipped}")
+          print("### Android lint")
+          lint = 'android/app/build/reports/lint-results-debug.xml'
+          if not os.path.exists(lint):
+              print("- report missing: the lint task did not complete")
+          else:
+              root = ET.parse(lint).getroot()
+              issues = root.findall('issue')
+              errors = sum(1 for i in issues if i.get('severity') == 'Error')
+              warnings = sum(1 for i in issues if i.get('severity') == 'Warning')
+              print(f"- errors: {errors}")
+              print(f"- warnings: {warnings}")
           PY
-          if [ -f android/app/build/reports/lint-results-debug.xml ]; then
-            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-            import xml.etree.ElementTree as ET
-            root = ET.parse('android/app/build/reports/lint-results-debug.xml').getroot()
-            issues = root.findall('issue')
-            errors = sum(1 for i in issues if i.get('severity') == 'Error')
-            warnings = sum(1 for i in issues if i.get('severity') == 'Warning')
-            print("### Android lint")
-            print(f"- errors: {errors}")
-            print(f"- warnings: {warnings}")
-            PY
-          else
-            {
-              echo "### Android lint"
-              echo "- report missing: the lint task did not complete"
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
 
       - name: Upload the QA artifact
         if: always()
