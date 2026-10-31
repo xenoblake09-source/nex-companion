@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NEX</string>
+    <string name="app_subtitle">Ultimate AI Pet &amp; Intelligent Companion</string>
+
+    <!-- Voice control -->
+    <string name="voice_start">Start voice</string>
+    <string name="voice_stop">Stop voice</string>
+    <string name="voice_hint">Say “Hello NEX”, then just talk. No wake phrase needed between answers.</string>
+    <string name="wake_phrase_hint">Listening only while NEX is open. An ordinary app cannot wake itself from a closed state.</string>
+
+    <!-- Permission honesty -->
+    <string name="permission_microphone_rationale">NEX listens only after you allow the microphone, and only while the app is open.</string>
+    <string name="permission_camera_rationale">The camera is used only when you ask about something in front of you, for one question.</string>
+    <string name="permission_location_rationale">Coarse location is asked for only when you want your local weather. Never in the background.</string>
+    <string name="permission_microphone_denied">Microphone permission is off, so NEX cannot listen.</string>
+    <string name="permission_camera_denied">Camera permission is off, so NEX cannot look.</string>
+    <string name="permissions_never_requested">NEX never asks for contacts, SMS, call logs, storage, accessibility, notifications or background location.</string>
+    <string name="permission_status_granted">Microphone: allowed</string>
+    <string name="permission_status_denied">Microphone: not allowed</string>
+
+    <!-- Camera -->
+    <string name="vision_button">What is this?</string>
+    <string name="camera_in_use">Camera is on — for this question only. Nothing is saved.</string>
+    <string name="camera_off">Camera is off</string>
+    <string name="camera_analyzing">Looking at the picture…</string>
+    <string name="camera_starting">Starting camera…</string>
+
+    <!-- Backend status -->
+    <string name="backend_checking">Checking my server…</string>
+    <string name="backend_ready">Server ready · %1$s</string>
+    <string name="backend_not_ready">Server is up but the AI key is not configured yet (%1$s)</string>
+    <string name="backend_unreachable">Cannot reach my server — offline answers only</string>
+    <string name="backend_not_configured">No server address is set in this build</string>
+    <string name="backend_refresh">Check server</string>
+
+    <!-- Transcript -->
+    <string name="transcript_you">You: %1$s</string>
+    <string name="transcript_nex">NEX: %1$s</string>
+    <string name="transcript_system">Note: %1$s</string>
+    <string name="transcript_grounded">NEX (live source): %1$s</string>
+    <string name="transcript_empty">Nothing said yet.</string>
+    <string name="sources_header">Sources (%1$d)</string>
+    <string name="source_line">• %1$s\n  %2$s</string>
+    <string name="sources_none">No live sources were used for that answer.</string>
+
+    <!-- Memory -->
+    <string name="memory_toggle">Memory</string>
+    <string name="memory_consent_label">Allow NEX to remember things on this device</string>
+    <string name="memory_consent_hint">Stored only here, never uploaded, never used to train a model.</string>
+    <string name="memory_clear">Delete everything remembered</string>
+    <string name="memory_empty">Nothing is remembered yet.</string>
+    <string name="memory_header">Remembered on this device (%1$d of %2$d)</string>
+    <string name="memory_entry">• %1$s</string>
+    <string name="memory_deleted">Deleted %1$d remembered items from this device.</string>
+
+    <!-- Settings -->
+    <string name="hindi_switch">Hindi / Hinglish</string>
+    <string name="reduce_motion_switch">Reduced motion</string>
+    <string name="settings_header">Settings</string>
+
+    <!-- Animation gallery (QA affordance: every one of the 56 is reachable) -->
+    <string name="gallery_button">Preview all 56 animations</string>
+    <string name="gallery_title">NEX animations — %1$d total</string>
+    <string name="gallery_entry">%1$d · %2$s</string>
+    <string name="animation_name_format">%1$d · %2$s</string>
+    <string name="animation_content_description">NEX animation surface</string>
+    <string name="animation_long_press_hint">Long-press the animation to step through the catalogue.</string>
+
+    <string name="offline_hint">Offline: greetings, privacy help, study prompts, memory and settings still work.</string>
+
+    <!-- Recovery, errors and honest hints -->
+    <string name="recovery_hint">NEX is recovering its voice service. Please wait.</string>
+    <string name="blocked_hint">Voice is paused. Nothing is being recorded right now.</string>
+    <string name="error_hint">Something went wrong. NEX will try again on its own, and will say so if it cannot.</string>
+    <string name="voice_resume_hint">Voice mode was on when you last left. Press “Start voice” when you are ready — NEX never listens by itself.</string>
+
+    <!-- Focus timer -->
+    <string name="focus_running">Focus timer running · %1$d:%2$02d left</string>
+    <string name="focus_complete">Focus time is complete. Take a short break.</string>
+
+    <!-- Vision turn -->
+    <string name="vision_not_stored">That picture was used for this one answer and was not stored.</string>
+
+    <!-- Coarse location (weather / place asks only) -->
+    <string name="location_granted">Thank you. I will use only an approximate location, and only when you ask about your area.</string>
+    <string name="location_denied">That is completely fine. Tell me your city and I will answer from there.</string>
+
+    <!-- Dialog actions -->
+    <string name="action_allow">Allow</string>
+    <string name="action_not_now">Not now</string>
+    <string name="open_settings">Open settings</string>
+    <string name="open_settings_message">%1$s\n\nYou can change this any time in Android settings → Apps → NEX → Permissions.</string>
+    <string name="open_settings_hint">You can change this any time in Android settings → Apps → NEX → Permissions.</string>
+</resources>

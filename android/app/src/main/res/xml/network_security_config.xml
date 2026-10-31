@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    NEX speaks HTTPS only.
+    * cleartext is disabled globally (matching android:usesCleartextTraffic="false");
+    * only system trust anchors are accepted, so a user-installed CA cannot intercept
+      conversation traffic;
+    * no debug-overrides block ships in the release source.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">onrender.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A dark stage keeps the 56 screen animations readable in any room light. -->
+    <color name="nex_background">#12152A</color>
+    <color name="nex_surface">#1B1F3A</color>
+    <color name="nex_surface_alt">#232849</color>
+    <color name="nex_primary">#9DBBFF</color>
+    <color name="nex_accent">#FFC98A</color>
+    <color name="nex_text">#EAF0FF</color>
+    <color name="nex_text_dim">#A9B3D6</color>
+    <color name="nex_ok">#8ADCB0</color>
+    <color name="nex_warn">#F2B876</color>
+    <color name="nex_error">#F09A9A</color>
+    <color name="nex_privacy">#B9A6F7</color>
+</resources>

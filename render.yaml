@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+# Render Blueprint for NEX — Ultimate AI Pet & Intelligent Companion
+#
+#   Web Service name : nex-companion-api
+#   Runtime          : Python 3.11 (FastAPI + uvicorn)
+#   Health check     : GET /health  (answers even with no API key configured)
+#
+# GEMINI_API_KEY has sync: false on purpose: Render asks for it in the
+# dashboard and the value is never written into this repository, a .env file,
+# a ZIP archive, the Android source or an APK.
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: nex-companion-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MAX_REPLY_TOKENS
+        value: "320"
+      - key: MAX_INPUT_CHARS
+        value: "1200"
+      - key: ALLOWED_ORIGINS
+        value: ""
