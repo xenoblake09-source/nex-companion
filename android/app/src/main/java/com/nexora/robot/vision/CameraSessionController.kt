@@ -25,6 +25,8 @@ import kotlin.coroutines.resumeWithException
  * Privacy rules implemented here:
  *  * the session only starts when [com.nexora.robot.privacy.PermissionPolicy] allowed it, which
  *    requires an explicit user request in the current turn;
+ *  * only the **front** camera is ever bound - a device without one gets an honest failure,
+ *    never a silent rear-camera fallback;
  *  * [inUse] drives a **visible** on-screen indicator, so the user always knows the camera is on;
  *  * a single frame is captured **in memory** — `ImageCapture.takePicture(File)` is never used,
  *    nothing is written to storage, and [stop] unbinds the camera immediately;
@@ -61,7 +63,12 @@ class CameraSessionController(
             provider.unbindAll()
             provider.bindToLifecycle(
                 lifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
+                // Front camera only, by product rule: requiring the front lens makes a
+                // device without one fail honestly (CameraInfoUnavailableException -> stop()
+                // -> false) instead of silently filming from the rear camera.
+                CameraSelector.Builder()
+                    .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
+                    .build(),
                 preview,
                 capture,
             )
