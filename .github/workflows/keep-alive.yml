@@ -1,0 +1,46 @@
+# ---------------------------------------------------------------------------
+# NEX keep-alive — stops Render's free tier from sleeping.
+#
+# Render spins free instances down after ~15 minutes without inbound traffic.
+# This scheduled request counts as traffic, so the service stays awake and the
+# first real question never waits 30-60 seconds for a cold start.
+#
+# Cost: nothing while this repository is PUBLIC (GitHub Actions is unlimited
+# for public repos). If the repository ever becomes private, every run bills
+# at least 1 minute against the 2,000 min/month free allowance (~4,300/month
+# at this frequency) - delete this file or lower the frequency first.
+# ---------------------------------------------------------------------------
+name: NEX keep alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"  # every 10 minutes, UTC
+  workflow_dispatch:        # also runnable by hand from the Actions tab
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping NEX backend /health
+        run: |
+          URL="https://nex-companion-api.onrender.com/health"
+          for i in 1 2 3; do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" -m 45 "$URL" || true)
+            echo "try $i -> HTTP ${code:-000}"
+            if [ -s /tmp/health.json ]; then
+              cat /tmp/health.json
+              echo
+            fi
+            if [ "$code" = "200" ]; then
+              echo "Service is awake."
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::warning::NEX backend did not answer 200 after 3 tries - check the Render dashboard."
+          exit 0  # a sleeping service is not a CI failure; keep the Actions tab green
