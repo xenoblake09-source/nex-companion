@@ -11,6 +11,7 @@
 # ---------------------------------------------------------------------------
 services:
   - type: web
+    plan: free
     name: nex-companion-api
     runtime: python
     rootDir: backend
