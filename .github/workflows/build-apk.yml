@@ -1,72 +1,202 @@
 # ---------------------------------------------------------------------------
-# NEX — cloud APK build. Nothing is installed on anyone's computer:
-# GitHub's own Linux runner checks out the repo, restores the executable bit
-# on gradlew (browser uploads store files as 100644), installs JDK 17, builds
-# the debug APK and runs every JVM unit test, then hands the APK back as a
-# downloadable artifact.
+# NEX — verified QA pipeline.
 #
-# Cost: this repository is public, and GitHub Actions is unlimited for public
-# repositories. If the repository ever becomes private, each run bills about
-# 10-20 Linux minutes against the 2,000 min/month free allowance.
+#   backend-tests   : pytest over backend/ on Python 3.11, no API key anywhere
+#   android-qa-apk  : JVM unit tests + lint + installable DEBUG QA APK on JDK 17
 #
-# The debug APK is signed with GitHub's ephemeral debug key - fine for your
-# own phone. The release build is deliberately left unsigned: no keystore
-# ever enters this repository.
+# Security baseline:
+#   * permissions: contents read only;
+#   * GEMINI_API_KEY is never an Actions variable - compilation and unit tests
+#     do not need it, and conftest.py strips it from the environment anyway;
+#   * no signing keystore exists in this repository: AGP signs the debug APK
+#     with its ephemeral generated key, which is correct for controlled QA and
+#     deliberately not a production-store release;
+#   * a hygiene gate fails the run if a forbidden path (.venv, site-packages,
+#     __pycache__, .gradle, build outputs, *.apk, *.aab, *.jks, *.keystore,
+#     .env) is ever tracked, or if a literal secret assignment appears.
+#
+# Cost: free while this repository is public. If it becomes private, each run
+# bills roughly 10-20 Linux minutes against the 2,000 min/month allowance.
 # ---------------------------------------------------------------------------
-name: Build APK
+name: NEX QA build
 
 on:
-  workflow_dispatch:          # manual "Run workflow" button
   push:
     branches: [main]
-    paths:
-      - "android/**"
-      - ".github/workflows/build-apk.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
-  group: build-apk
+  group: nex-qa-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  apk:
-    name: Debug APK + JVM unit tests
+  backend-tests:
+    name: Backend pytest (keyless, stub provider)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Create backend/.venv
+        working-directory: backend
+        run: python -m venv .venv
+
+      - name: Install backend requirements
+        working-directory: backend
+        run: |
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install -r requirements.txt
+
+      - name: Run pytest -q
+        working-directory: backend
+        run: .venv/bin/python -m pytest -q
+
+  android-qa-apk:
+    name: Android unit tests, lint and QA debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Check out the repository
+      - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Restore the executable bit on gradlew
-        working-directory: android
-        run: chmod +x gradlew
+      - name: Secret and hygiene gate
+        shell: bash
+        run: |
+          bad=0
+          echo "-- tracked forbidden paths --"
+          if git ls-files | grep -E '(^|/)(\.venv/|site-packages/|__pycache__/|\.gradle/|build/)|\.(apk|aab|jks|keystore)$|(^|/)\.env$'; then
+            echo "::error::a forbidden path is tracked in git"; bad=1
+          fi
+          echo "-- copied dependency internals --"
+          if git ls-files | grep -E '(^|/)cryptography/|(^|/)(fernet|backend)\.py$'; then
+            echo "::error::copied dependency internals are tracked"; bad=1
+          fi
+          echo "-- literal secret assignments (names alone are not flagged) --"
+          if git grep -nIE '(GEMINI_API_KEY|OPENAI_API_KEY|GITHUB_TOKEN|RENDER_TOKEN|DEVICE_TOKENS|[A-Za-z0-9_]*SECRET[A-Za-z0-9_]*)[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_\-]{16,}' -- .; then
+            echo "::error::a literal secret assignment is tracked"; bad=1
+          fi
+          if [ "$bad" != "0" ]; then exit 1; fi
+          echo "hygiene gate passed"
 
-      - name: Set up JDK 17
+      - name: Set up Temurin JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept licences and install the exact platform and build tools
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platforms;android-35" "build-tools;34.0.0"
+
+      - name: Make gradlew executable
+        working-directory: android
+        run: chmod +x gradlew
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build the debug APK and run the JVM unit tests
+      - name: Unit tests, lint and the QA debug APK
         working-directory: android
-        run: ./gradlew :app:assembleDebug :app:testDebugUnitTest --stacktrace
+        run: |
+          ./gradlew :app:testDebugUnitTest \
+            :app:lintDebug \
+            :app:assembleDebug \
+            -PnexBackendUrl=https://nex-companion-api.onrender.com \
+            --stacktrace
 
-      - name: Upload the APK artifact
+      - name: Verify, rename and checksum the APK
+        working-directory: android
+        run: |
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p ../qa-out
+          cp app/build/outputs/apk/debug/app-debug.apk ../qa-out/NEX_1.0.0_QA_debug.apk
+          cd ../qa-out
+          sha256sum NEX_1.0.0_QA_debug.apk > NEX_1.0.0_QA_debug.apk.sha256
+          cat NEX_1.0.0_QA_debug.apk.sha256
+
+      - name: Extract package identity from the APK
+        if: always()
+        run: |
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 2>/dev/null | tail -1)
+          if [ -n "$AAPT2" ] && [ -f qa-out/NEX_1.0.0_QA_debug.apk ]; then
+            "$AAPT2" dump badging qa-out/NEX_1.0.0_QA_debug.apk \
+              | grep -E '^package|versionName|versionCode|sdkVersion|targetSdkVersion|application-label' \
+              | tee apk-badging.txt
+            {
+              echo "### APK identity"
+              echo '```'
+              cat apk-badging.txt
+              echo '```'
+              echo "### SHA-256"
+              echo '```'
+              cat qa-out/NEX_1.0.0_QA_debug.apk.sha256
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Test and lint counts to the job summary
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import glob
+          import xml.etree.ElementTree as ET
+          tests = failures = errors = skipped = 0
+          for path in glob.glob('android/app/build/test-results/testDebugUnitTest/*.xml'):
+              root = ET.parse(path).getroot()
+              tests += int(root.get('tests', 0))
+              failures += int(root.get('failures', 0))
+              errors += int(root.get('errors', 0))
+              skipped += int(root.get('skipped', 0))
+          print("### Android unit tests")
+          print(f"- tests: {tests}")
+          print(f"- failures: {failures}")
+          print(f"- errors: {errors}")
+          print(f"- skipped: {skipped}")
+          PY
+          if [ -f android/app/build/reports/lint-results-debug.xml ]; then
+            python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+            import xml.etree.ElementTree as ET
+            root = ET.parse('android/app/build/reports/lint-results-debug.xml').getroot()
+            issues = root.findall('issue')
+            errors = sum(1 for i in issues if i.get('severity') == 'Error')
+            warnings = sum(1 for i in issues if i.get('severity') == 'Warning')
+            print("### Android lint")
+            print(f"- errors: {errors}")
+            print(f"- warnings: {warnings}")
+            PY
+          else
+            {
+              echo "### Android lint"
+              echo "- report missing: the lint task did not complete"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the QA artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nex-companion-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: NEX-Android-QA-APK
+          path: |
+            qa-out/NEX_1.0.0_QA_debug.apk
+            qa-out/NEX_1.0.0_QA_debug.apk.sha256
+            android/app/build/reports/lint-results-debug.html
+            android/app/build/test-results/testDebugUnitTest/
           retention-days: 14
           if-no-files-found: warn
-
-      - name: Upload unit test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          path: android/app/build/reports/tests/testDebugUnitTest
-          retention-days: 14
-          if-no-files-found: ignore
