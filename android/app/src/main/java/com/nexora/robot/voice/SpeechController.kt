@@ -25,6 +25,8 @@ import com.nexora.robot.net.NexErrorCodes
 import com.nexora.robot.net.SourceLink
 import com.nexora.robot.offline.FocusTimerPolicy
 import com.nexora.robot.offline.OfflineResponses
+import com.nexora.robot.offline.PetTrick
+import com.nexora.robot.offline.PetTricks
 import com.nexora.robot.util.AppSettings
 import com.nexora.robot.util.NexLog
 import kotlinx.coroutines.CoroutineScope
@@ -425,6 +427,13 @@ class SpeechController(
         dispatch(VoiceEvent.Transcription(text))
         if (_state.value.state != ConversationState.THINKING) return
 
+        // Party tricks are answered on-device, before intent detection: they never reach
+        // the server, cost no quota, and work with no network at all.
+        PetTricks.parse(text)?.let { trick ->
+            performPetTrick(trick, language)
+            return
+        }
+
         when (intent) {
             UserIntent.VISION_REQUEST -> {
                 armTurnWatchdog()
@@ -688,6 +697,29 @@ class SpeechController(
     fun focusRemainingMs(): Long = focusTimer.remainingAt(clock())
 
     /** Finish a locally answered turn: one honest sentence, then back to listening. */
+    /**
+     * Animal voices and twenty-language hellos, entirely on-device.
+     *
+     * A greeting is spoken in its own language when this device's TTS engine owns a voice
+     * for it. When it does not, NEX never mangles the script with the wrong voice: the
+     * greeting stays on screen as its own transcript line and the spoken line honestly says
+     * which language the phone cannot speak yet.
+     */
+    private fun performPetTrick(trick: PetTrick, language: String) {
+        when (trick) {
+            is PetTrick.AnimalVoice -> finishLocalTurn(trick.animal.sound, language, trick.cue)
+            is PetTrick.GreetingIn -> {
+                val greeting = trick.greeting
+                if (tts.supports(greeting.tag)) {
+                    finishLocalTurn(greeting.text, greeting.tag, trick.cue)
+                } else {
+                    appendLine(Speaker.NEX, "${greeting.text} ${greeting.flag}")
+                    finishLocalTurn(greeting.unsupportedLine(language), language, trick.cue)
+                }
+            }
+        }
+    }
+
     private fun finishLocalTurn(message: String, language: String, cue: AnimationCue) {
         turnWatchdogJob?.cancel()
         _sources.value = emptyList()

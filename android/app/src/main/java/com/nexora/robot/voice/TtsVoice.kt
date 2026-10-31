@@ -175,9 +175,22 @@ class TtsVoice(
         }
     }
 
-    private fun localeFor(language: String): Locale = when {
-        language.lowercase().startsWith("hi") -> Locale("hi", "IN")
-        else -> Locale.US
+    /**
+     * Maps a reply language tag to a TTS locale.
+     *
+     * Two-letter tags are matched exactly (never by prefix), so "ta" cannot land on Tamil's
+     * neighbour and an unknown tag simply becomes a bare [Locale] the engine will reject,
+     * which [applyLanguage] turns into the documented English fallback.
+     */
+    private fun localeFor(language: String): Locale {
+        val tag = language.lowercase().substringBefore('-').trim()
+        return when (tag) {
+            "" -> Locale.US
+            "en" -> Locale.US
+            "hi" -> Locale("hi", "IN")
+            "zh" -> Locale.SIMPLIFIED_CHINESE
+            else -> Locale(tag)
+        }
     }
 
     private fun nextUtteranceId(): String = "nex-${utteranceIds.incrementAndGet()}"
