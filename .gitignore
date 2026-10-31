@@ -1,0 +1,77 @@
+# ---------------------------------------------------------------------------
+# NEX — Ultimate AI Pet & Intelligent Companion
+# Nothing secret, generated or personal may ever be committed.
+# ---------------------------------------------------------------------------
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.keystore
+*.p12
+*.pfx
+secrets.json
+credentials.json
+service-account*.json
+local.properties
+
+# Python
+.venv/
+venv/
+env/
+site-packages/
+pip-wheel-metadata/
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Gradle / Android
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+release/
+output-metadata.json
+
+# IDEs and editors
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# Operating systems
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node (only if a tool is ever added)
+node_modules/
+
+# Logs and temporary artefacts
+*.log
+logs/
+tmp/
+*.tmp
+*.bak
+*.zip
